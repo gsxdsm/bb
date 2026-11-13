@@ -7,6 +7,16 @@ module.exports = ({ config }) => {
     throw new Error("BB_MOBILE_VARIANT must be production or dev");
   }
   const isDev = variant === "dev";
+  const devOverride = (name) => {
+    const value = isDev ? process.env[name]?.trim() : undefined;
+    return value ? value : undefined;
+  };
+  const devIosBundleIdentifier = devOverride(
+    "BB_MOBILE_DEV_IOS_BUNDLE_IDENTIFIER",
+  );
+  const devEasProjectId = devOverride("BB_MOBILE_DEV_EAS_PROJECT_ID");
+  const devExpoOwner = devOverride("BB_MOBILE_DEV_EXPO_OWNER");
+  const devExpoSlug = devOverride("BB_MOBILE_DEV_EXPO_SLUG");
   const googleServicesFile = process.env.GOOGLE_SERVICES_JSON
     ? resolve(process.env.GOOGLE_SERVICES_JSON)
     : resolve(__dirname, "google-services.json");
@@ -21,7 +31,15 @@ module.exports = ({ config }) => {
   }
   return {
     ...config,
-    extra: { ...config.extra, bbMobileVariant: variant },
+    ...(devExpoOwner ? { owner: devExpoOwner } : {}),
+    ...(devExpoSlug ? { slug: devExpoSlug } : {}),
+    extra: {
+      ...config.extra,
+      bbMobileVariant: variant,
+      ...(devEasProjectId
+        ? { eas: { ...config.extra.eas, projectId: devEasProjectId } }
+        : {}),
+    },
     ...(isDev
       ? {
           name: "bb dev",
@@ -44,6 +62,20 @@ module.exports = ({ config }) => {
           ),
         }
       : {}),
+    ios: {
+      ...config.ios,
+      ...(isDev
+        ? {
+            icon: {
+              light: "./assets/ios-icon-dev.png",
+              dark: "./assets/ios-icon-dev-dark.png",
+            },
+          }
+        : {}),
+      ...(devIosBundleIdentifier
+        ? { bundleIdentifier: devIosBundleIdentifier, associatedDomains: [] }
+        : {}),
+    },
     android: {
       ...config.android,
       ...(isDev
