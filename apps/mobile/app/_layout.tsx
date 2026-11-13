@@ -30,6 +30,7 @@ export { RouteErrorBoundary as ErrorBoundary };
 export default function RootLayout() {
   const boot = useAppBoot();
 
+  if (boot.error !== null) throw boot.error;
   if (!boot.ready) return null;
 
   return (

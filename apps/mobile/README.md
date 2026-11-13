@@ -260,6 +260,16 @@ The native `bb://` scheme works without those certificates.
 Pending credentials do not establish push delivery or verified HTTPS app-link
 coverage. Test those separately once Firebase/signing are configured.
 
+### Saved-server startup errors
+
+Saved-server storage failures at startup go to the native error screen with
+**Try again**, instead of leaving the initial route loading indefinitely.
+Retrying reads the existing profiles again and never clears them. Simulator
+startup verification must use a signed app with an application identity;
+unsigned builds can fail SecureStore reads with a missing-entitlement error.
+The app identifier supplies the default keychain access group, as described in
+[Apple's keychain access documentation](https://developer.apple.com/documentation/security/sharing-access-to-keychain-items-among-a-collection-of-apps).
+
 ### iOS prerequisites
 
 - Xcode 27.1 with an iOS 27.1 simulator runtime (`xcodebuild -downloadPlatform iOS`).

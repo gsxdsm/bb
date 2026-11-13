@@ -67,6 +67,32 @@ describe("profile store", () => {
     expect(reloaded.getSnapshot().activeProfileId).toBe(b.id);
   });
 
+  it("preserves saved servers across a storage read failure and a later load retry", async () => {
+    const { store, storage } = makeStore();
+    const profile = await store.addProfile(direct);
+    const saved = new Map(storage.entries);
+    let readFails = true;
+    const reloaded = createProfileStore({
+      storage: {
+        ...storage,
+        getItem: async (key) => {
+          if (readFails) throw new Error("Keychain is unavailable");
+          return storage.getItem(key);
+        },
+      },
+    });
+
+    await expect(reloaded.load()).rejects.toThrow("Keychain is unavailable");
+    expect(storage.entries).toEqual(saved);
+    readFails = false;
+    await expect(reloaded.load()).resolves.toMatchObject({
+      status: "ready",
+      profiles: [profile],
+      activeProfileId: profile.id,
+    });
+    expect(storage.entries).toEqual(saved);
+  });
+
   it("removeProfile deletes the key, heals the active id, and notifies listeners", async () => {
     const { store, storage } = makeStore();
     const a = await store.addProfile(direct);
