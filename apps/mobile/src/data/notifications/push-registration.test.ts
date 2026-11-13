@@ -16,6 +16,7 @@ import {
   PUSH_NOTIFICATIONS_PLUGIN_DISABLED_STATUS,
   type PushSubscriptionsApi,
 } from "./push-subscriptions-api";
+import type { PushSubscriptionRecord } from "./push-contract";
 
 interface FakeModuleOptions {
   projectId?: string | null;
@@ -60,14 +61,27 @@ function fakeModule(options: FakeModuleOptions = {}) {
 }
 
 function fakeApi() {
+  const rows: PushSubscriptionRecord[] = [];
   const api = {
-    register: vi.fn<PushSubscriptionsApi["register"]>(async () => ({
-      subscriptionId: "sub_1",
-    })),
-    unregister: vi.fn<PushSubscriptionsApi["unregister"]>(
-      async () => undefined,
-    ),
-    list: vi.fn<PushSubscriptionsApi["list"]>(async () => []),
+    rows,
+    register: vi.fn<PushSubscriptionsApi["register"]>(async (_url, input) => {
+      const index = rows.findIndex((row) => row.id === "sub_1");
+      if (index >= 0) rows.splice(index, 1);
+      rows.push({
+        id: "sub_1",
+        platform: input.platform,
+        deviceLabel: input.deviceLabel,
+        createdAt: 0,
+        lastSeenAt: 0,
+        tokenSuffix: input.expoPushToken.slice(-6),
+      });
+      return { subscriptionId: "sub_1" };
+    }),
+    unregister: vi.fn<PushSubscriptionsApi["unregister"]>(async (_url, ref) => {
+      const index = rows.findIndex((row) => row.id === ref.subscriptionId);
+      if (index >= 0) rows.splice(index, 1);
+    }),
+    list: vi.fn<PushSubscriptionsApi["list"]>(async () => [...rows]),
   };
   return api;
 }
@@ -326,6 +340,52 @@ describe("syncPushRegistration", () => {
       }),
     );
     expect(api.register).toHaveBeenCalledTimes(2);
+  });
+
+  it("registers again when the server no longer has the recorded subscription", async () => {
+    const { store, deps, api } = setup();
+    store.setEnabled(profile.id, true);
+    await syncPushRegistration(deps, profile);
+    api.rows.splice(0, api.rows.length);
+
+    expect(await syncPushRegistration(deps, profile)).toEqual({
+      action: "registered",
+      expoPushToken: "ExponentPushToken[abc]",
+    });
+    expect(api.register).toHaveBeenCalledTimes(2);
+    expect(api.unregister).not.toHaveBeenCalled();
+    expect(api.rows.map((row) => row.id)).toEqual(["sub_1"]);
+  });
+
+  it("keeps an up-to-date record when the server cannot list its subscriptions", async () => {
+    const { store, deps, api } = setup();
+    store.setEnabled(profile.id, true);
+    await syncPushRegistration(deps, profile);
+    api.list.mockRejectedValueOnce(new Error("offline"));
+
+    expect(await syncPushRegistration(deps, profile)).toEqual({
+      action: "skipped",
+      reason: "up-to-date",
+    });
+    expect(api.register).toHaveBeenCalledTimes(1);
+  });
+
+  it("matches a record without a subscription id by its token suffix", async () => {
+    const { store, deps, api } = setup();
+    store.setEnabled(profile.id, true);
+    await syncPushRegistration(deps, profile);
+    const record = store.getRegistration(profile.id);
+    if (record === null) throw new Error("expected a registration");
+    store.setRegistration(profile.id, { ...record, subscriptionId: null });
+
+    expect(await syncPushRegistration(deps, profile)).toEqual({
+      action: "skipped",
+      reason: "up-to-date",
+    });
+    api.rows.splice(0, api.rows.length);
+    expect(await syncPushRegistration(deps, profile)).toMatchObject({
+      action: "registered",
+    });
   });
 
   it("refreshes a registration older than the refresh window", async () => {

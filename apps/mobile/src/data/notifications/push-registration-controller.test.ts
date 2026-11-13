@@ -24,14 +24,29 @@ function setup() {
     },
     setBadgeCount: async () => undefined,
   };
+  let registered = false;
   const api = {
-    register: vi.fn<PushSubscriptionsApi["register"]>(async () => ({
-      subscriptionId: "sub_1",
-    })),
-    unregister: vi.fn<PushSubscriptionsApi["unregister"]>(
-      async () => undefined,
+    register: vi.fn<PushSubscriptionsApi["register"]>(async () => {
+      registered = true;
+      return { subscriptionId: "sub_1" };
+    }),
+    unregister: vi.fn<PushSubscriptionsApi["unregister"]>(async () => {
+      registered = false;
+    }),
+    list: vi.fn<PushSubscriptionsApi["list"]>(async () =>
+      registered
+        ? [
+            {
+              id: "sub_1",
+              platform: "android",
+              deviceLabel: "Pixel",
+              createdAt: 0,
+              lastSeenAt: 0,
+              tokenSuffix: "tok",
+            },
+          ]
+        : [],
     ),
-    list: vi.fn<PushSubscriptionsApi["list"]>(async () => []),
   };
   const controller = createPushRegistrationController({
     notifications,
