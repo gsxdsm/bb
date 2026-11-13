@@ -244,10 +244,11 @@ Android 16. Recheck and remove it when upgrading to a version with the fix.
 ### iOS dev variant
 
 `BB_MOBILE_VARIANT=dev` also applies on iOS: the home-screen name is **bb
-dev**, and the icon is the orange bb mark with a blue "DEV" band
-(`assets/ios-icon-dev.png`, and `assets/ios-icon-dev-dark.png` for dark mode,
-which uses the tinted dark-mode mark on a transparent background). Both were
-composited with sharp from `icon-dev.png` / `ios-icon-dark.png`. The bundle id
+dev**, and the icon is the white bb mark on black with an orange "DEV" band
+in black text (`assets/ios-icon-dev.png`, and the identical
+`assets/ios-icon-dev-dark.png` for dark mode). It was composited with sharp
+from the mark in `ios-icon-dark.png`, converted to greyscale and scaled so its
+brightest pixel is white. The bundle id
 and EAS project stay bb's by default. To sign and receive pushes under another
 Apple team and Expo account, set these for both `expo prebuild` and the
 Xcode build (they apply to the dev variant only):
