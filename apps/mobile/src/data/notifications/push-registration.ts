@@ -147,6 +147,7 @@ export async function syncPushRegistration(
   }
   const platform = notifications.platform;
   if (
+    existing &&
     !shouldReregister({
       existing,
       expoPushToken,
@@ -154,7 +155,8 @@ export async function syncPushRegistration(
       serverUrl: profile.serverUrl,
       now: now(),
       refreshAfterMs,
-    })
+    }) &&
+    (await isStillRegistered(api, profile.serverUrl, existing))
   ) {
     return { action: "skipped", reason: "up-to-date" };
   }
@@ -186,6 +188,24 @@ export async function syncPushRegistration(
     registeredAt: now(),
   });
   return { action: "registered", expoPushToken };
+}
+
+async function isStillRegistered(
+  api: PushSubscriptionsApi,
+  serverUrl: string,
+  existing: PushRegistrationRecord,
+): Promise<boolean> {
+  let rows: Awaited<ReturnType<PushSubscriptionsApi["list"]>>;
+  try {
+    rows = await api.list(serverUrl);
+  } catch {
+    return true;
+  }
+  return rows.some((row) =>
+    existing.subscriptionId !== null
+      ? row.id === existing.subscriptionId
+      : row.tokenSuffix === existing.tokenSuffix,
+  );
 }
 
 export async function unregisterPushRegistration(

@@ -530,7 +530,11 @@ iOS keeps its existing APNs registration behavior.
   connect, on
   AppState active, when the OS rolls the token (re-register), and when the
   toggle flips; profiles removed from the app get their server row deleted
-  by the stored server URL. A direct profile must use HTTPS, unless it uses
+  by the stored server URL. A registration the phone still considers current
+  is checked against `pushSubscriptions.list`, so a row removed on the server
+  (`bb push-notifications remove`, a reset) is registered again on the next
+  sync instead of waiting for the 24-hour refresh; if the list call fails the
+  phone keeps its record. A direct profile must use HTTPS, unless it uses
   `127.0.0.1`, `localhost`, or `::1`. Tailscale Serve and bb connect profiles
   work normally. Other HTTP profiles show "Push needs HTTPS or bb connect"
   and do not register. The server also needs outbound access to `exp.host`.
