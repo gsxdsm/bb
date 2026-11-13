@@ -285,6 +285,14 @@ The native `bb://` scheme works without those certificates.
 Pending credentials do not establish push delivery or verified HTTPS app-link
 coverage. Test those separately once Firebase/signing are configured.
 
+### iPhone Duo safe areas after foregrounding
+
+The iOS shell refreshes safe-area geometry after returning to the foreground,
+even when the vertical status-bar mode is unchanged. A deferred bar-change
+refresh is marked settled only after it runs, so leaving the screen during
+the delay cannot suppress the refresh when returning. Verify both app
+switching and leaving/returning to the WebView during a bar transition on Duo.
+
 ### iOS prerequisites
 
 - Xcode 27.1 with an iOS 27.1 simulator runtime (`xcodebuild -downloadPlatform iOS`).

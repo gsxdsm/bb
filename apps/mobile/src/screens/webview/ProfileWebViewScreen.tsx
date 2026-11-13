@@ -250,10 +250,23 @@ export function ProfileWebViewScreen() {
   );
 
   useEffect(() => {
+    let refreshTimer: ReturnType<typeof setTimeout> | undefined;
     const subscription = AppState.addEventListener("change", (state) => {
-      if (state === "active") bridge.send({ type: "resume" });
+      clearTimeout(refreshTimer);
+      if (state === "active") {
+        bridge.send({ type: "resume" });
+        if (Platform.OS === "ios") {
+          refreshTimer = setTimeout(
+            refreshWindowSafeArea,
+            SAFE_AREA_REFRESH_DELAY_MS,
+          );
+        }
+      }
     });
-    return () => subscription.remove();
+    return () => {
+      subscription.remove();
+      clearTimeout(refreshTimer);
+    };
   }, [bridge]);
 
   const previousSession = useRef(session);
