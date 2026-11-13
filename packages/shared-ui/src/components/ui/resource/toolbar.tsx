@@ -231,7 +231,7 @@ export function ResourceToolbar({
               }}
               className={cn(
                 "h-8 truncate pl-8 focus:border-ring/60 focus:text-clip focus:ring-2 focus:ring-ring/20 focus-visible:ring-2 focus-visible:ring-ring/20 max-md:pointer-coarse:h-8",
-                expandSearchOnFocus && "text-xs max-md:pointer-coarse:text-xs",
+                expandSearchOnFocus && "text-xs max-md:pointer-coarse:text-base",
                 (searchExpanded || (!searchCondensed && searchValue)) && "pr-8",
               )}
             />

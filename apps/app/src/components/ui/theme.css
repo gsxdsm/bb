@@ -134,6 +134,13 @@
   --bb-detail-row-icon-size: calc(var(--spacing) * 3);
 }
 
+@media (pointer: coarse) {
+  :root {
+    --text-base: 1rem;
+    --text-base--line-height: 1.5rem;
+  }
+}
+
 @media (max-width: 767px) and (pointer: coarse) {
   :root {
     --bb-detail-row-icon-size: calc(var(--spacing) * 4);

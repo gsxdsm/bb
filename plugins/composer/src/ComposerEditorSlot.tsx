@@ -50,6 +50,7 @@ export function ComposerEditorSlot({
       className={cn(
         "w-full overflow-y-auto bg-transparent px-4 pb-1 pr-14 pt-3 outline-none",
         COARSE_POINTER_TEXT_BASE_CLASS,
+        "pointer-coarse:text-base",
         "leading-relaxed",
         isCompactLayout && "h-12 overflow-hidden pb-0 pr-2 pt-0",
       )}
