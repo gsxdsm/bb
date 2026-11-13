@@ -235,6 +235,25 @@ screens, matching the fix proposed in upstream
 It addresses a release-build crash reproduced immediately after pairing on
 Android 16. Recheck and remove it when upgrading to a version with the fix.
 
+### iOS dev variant
+
+`BB_MOBILE_VARIANT=dev` also applies on iOS: the home-screen name is **bb
+dev**, and the icon is the orange bb mark with a blue "DEV" band
+(`assets/ios-icon-dev.png`, and `assets/ios-icon-dev-dark.png` for dark mode,
+which uses the tinted dark-mode mark on a transparent background). Both were
+composited with sharp from `icon-dev.png` / `ios-icon-dark.png`. The bundle id
+and EAS project stay bb's by default. To sign and receive pushes under another
+Apple team and Expo account, set these for both `expo prebuild` and the
+Xcode build (they apply to the dev variant only):
+
+- `BB_MOBILE_DEV_IOS_BUNDLE_IDENTIFIER`: the bundle id to sign. Associated
+  domains are dropped, since `getbb.app` app links name bb's team.
+- `BB_MOBILE_DEV_EAS_PROJECT_ID`, `BB_MOBILE_DEV_EXPO_OWNER`,
+  `BB_MOBILE_DEV_EXPO_SLUG`: an EAS project you own. The app's Expo push token
+  belongs to that project, and Expo's relay sends with the APNs key that
+  project holds for the bundle id (`eas credentials -p ios` → Push
+  Notifications). bb's project only has a key for bb's own team.
+
 ### Android production setup
 
 The manual `Mobile Android (EAS)` workflow builds preview APKs or production
