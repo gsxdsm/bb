@@ -41,7 +41,13 @@ beforeEach(async () => {
   target = document.querySelector<HTMLElement>("#target")!;
   trigger = document.querySelector<HTMLButtonElement>("button")!;
   trigger.addEventListener("click", () => {
-    opened += 1;
+    const open = trigger.getAttribute("aria-expanded") === "false";
+    if (open) opened += 1;
+    trigger.setAttribute("aria-expanded", String(open));
+    const panel = document.querySelector(
+      '[data-sidebar="panel"][data-vaul-drawer-direction]',
+    );
+    panel?.setAttribute("data-state", open ? "open" : "closed");
   });
   const app = await loadPluginApp(() => import("./app"));
   const scripts = await mountPluginContentScripts(app, {
@@ -273,3 +279,135 @@ it.each(["touchend", "touchcancel", "blur", "dispose"])(
     expect(target.getAttribute("data-no-sidebar-swipe")).toBe("original");
   },
 );
+
+it("reveals the mobile sidebar in proportion to finger movement and reverses with the finger", () => {
+  const inset = document.querySelector<HTMLElement>('[data-sidebar="inset"]')!;
+  const backdrop = document.createElement("div");
+  backdrop.setAttribute("data-sidebar-mobile-backdrop", "");
+  document.body.append(backdrop);
+  touch("touchstart", 8);
+  touch("touchmove", 88);
+  expect(inset.style.translate).toBe("80px");
+  expect(inset.style.transition).toBe("none");
+  expect(Number(backdrop.style.opacity)).toBeGreaterThan(0);
+  expect(opened).toBe(0);
+  touch("touchmove", 38);
+  expect(inset.style.translate).toBe("30px");
+  touch("touchend", 38);
+  expect(opened).toBe(0);
+  expect(inset.style.translate).toBe("0px");
+});
+
+it.each(["touchcancel", "blur", "dispose", "multitouch"])(
+  "restores preview styles after %s",
+  async (finish) => {
+    const inset = document.querySelector<HTMLElement>(
+      '[data-sidebar="inset"]',
+    )!;
+    inset.style.translate = "3px";
+    inset.style.transition = "opacity 100ms";
+    touch("touchstart", 8);
+    touch("touchmove", 90);
+    expect(inset.style.translate).toBe("82px");
+    if (finish === "blur") window.dispatchEvent(new Event("blur"));
+    else if (finish === "dispose") await dispose?.();
+    else if (finish === "multitouch") touch("touchmove", 90, 100, 2);
+    else touch("touchcancel", 90);
+    expect(opened).toBe(0);
+    expect(inset.style.translate).toBe("3px");
+    expect(inset.style.transition).toBe("opacity 100ms");
+  },
+);
+
+it("cleans up a settling preview after the host sidebar opens", async () => {
+  vi.useFakeTimers();
+  try {
+    const inset = document.querySelector<HTMLElement>(
+      '[data-sidebar="inset"]',
+    )!;
+    touch("touchstart", 8);
+    touch("touchmove", 100);
+    touch("touchend", 140);
+    expect(opened).toBe(1);
+    expect(inset.style.transition).toContain("220ms");
+    await vi.advanceTimersByTimeAsync(240);
+    expect(inset.style.translate).toBe("");
+    expect(inset.style.transition).toBe("");
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+it("does not reopen after reversing a drag back to its starting edge", () => {
+  touch("touchstart", 8);
+  touch("touchmove", 150);
+  touch("touchmove", 10);
+  touch("touchend", 10);
+  expect(opened).toBe(0);
+});
+
+it.each([true, false])(
+  "tracks a wide native sidebar and settles with open=%s",
+  async (keepOpen) => {
+    vi.useFakeTimers();
+    try {
+      const panel = document.querySelector<HTMLElement>(
+        '[data-sidebar="panel"]',
+      )!;
+      panel.removeAttribute("data-vaul-drawer-direction");
+      panel.removeAttribute("data-state");
+      const wrapper = document.createElement("div");
+      panel.replaceWith(wrapper);
+      const gap = document.createElement("div");
+      gap.setAttribute("data-sidebar", "gap");
+      wrapper.append(gap, panel);
+      vi.spyOn(gap, "getBoundingClientRect").mockReturnValue(
+        new DOMRect(0, 0, 48, 800),
+      );
+      vi.spyOn(panel, "getBoundingClientRect").mockImplementation(
+        () => new DOMRect(0, 0, panel.style.width ? 256 : 48, 800),
+      );
+      const inset = document.querySelector<HTMLElement>(
+        '[data-sidebar="inset"]',
+      )!;
+      touch("touchstart", 8);
+      touch("touchmove", 88);
+      expect(opened).toBe(1);
+      expect(gap.style.width).toBe("48px");
+      expect(inset.style.translate).toBe("80px");
+      expect(panel.style.clipPath).toBe("inset(0px 128px 0px 0px)");
+      touch("touchend", keepOpen ? 150 : 10);
+      await vi.advanceTimersByTimeAsync(240);
+      expect(trigger.getAttribute("aria-expanded")).toBe(String(keepOpen));
+      expect(inset.style.translate).toBe("");
+      expect(panel.style.clipPath).toBe("");
+      expect(gap.style.width).toBe("");
+      expect(opened).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  },
+);
+
+it("does not restore the host's old closed-position styles after committing open", async () => {
+  vi.useFakeTimers();
+  try {
+    const inset = document.querySelector<HTMLElement>(
+      '[data-sidebar="inset"]',
+    )!;
+    inset.style.translate = "0px";
+    const backdrop = document.createElement("div");
+    backdrop.setAttribute("data-sidebar-mobile-backdrop", "");
+    backdrop.style.opacity = "0";
+    document.body.append(backdrop);
+    touch("touchstart", 8);
+    touch("touchmove", 100);
+    touch("touchend", 140);
+    await vi.advanceTimersByTimeAsync(240);
+    expect(trigger.getAttribute("aria-expanded")).toBe("true");
+    expect(inset.style.translate).toBe("");
+    expect(backdrop.style.opacity).toBe("");
+  } finally {
+    vi.useRealTimers();
+  }
+});

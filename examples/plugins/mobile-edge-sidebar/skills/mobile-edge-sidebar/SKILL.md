@@ -5,10 +5,14 @@ description: Explain or manage the Mobile Edge Sidebar plugin.
 
 # Mobile Edge Sidebar
 
-Swipe right at least 48 pixels from the leftmost 64 pixels within one second
-to open bb's sidebar. In the native app this includes the header, footer,
+Swipe right at least 48 pixels from the leftmost 64 pixels
+to open bb's sidebar. Once horizontal intent is clear, the sidebar follows
+the finger and can be dragged back toward the edge. Releasing past 48 pixels
+settles open; releasing short settles closed. Slow deliberate drags work too.
+In the native app this includes the header, footer,
 safe-area margins and wide layouts. It uses bb's existing sidebar button
-without changing browser history.
+without changing browser history. Temporary drag styles are restored on
+release, cancellation, window resize, blur and plugin disposal.
 
 In the native app, taps and vertical scrolling remain available in the edge
 area. A horizontal swipe takes priority over controls such as buttons and

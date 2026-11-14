@@ -5,5 +5,5 @@
     "noEmit": true,
     "rootDir": "."
   },
-  "include": ["app.ts", "server.ts"]
+  "include": ["app.ts", "server.ts", "motion.ts"]
 }

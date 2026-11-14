@@ -1,4 +1,5 @@
 import { definePluginApp } from "@get-bb/plugin-sdk/app";
+import { createSidebarMotion } from "./motion.js";
 
 const EXCLUDED =
   'input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="slider"], [role="dialog"], [data-vaul-drawer]';
@@ -15,6 +16,7 @@ export default definePluginApp((app) => {
         target: Element;
         claimed: boolean;
       } | null = null;
+      let motion: ReturnType<typeof createSidebarMotion> = null;
       let markedTarget: Element | null = null;
       const restoreTarget = () => {
         if (markedTarget?.getAttribute("data-no-sidebar-swipe") === "")
@@ -51,6 +53,8 @@ export default definePluginApp((app) => {
         window.getSelection()?.isCollapsed !== false;
       const reset = () => {
         gesture = null;
+        motion?.cancel();
+        motion = null;
         restoreTarget();
       };
       const clearClick = () => {
@@ -125,28 +129,46 @@ export default definePluginApp((app) => {
           }
           if (dx < 10 || dx <= Math.abs(dy) * 1.25) return;
           current.claimed = true;
+          motion = createSidebarMotion(
+            () => getTrigger()?.click(),
+            () =>
+              document
+                .querySelector<HTMLButtonElement>(
+                  '[data-sidebar="trigger"][aria-expanded="true"]',
+                )
+                ?.click(),
+          );
         }
+        motion?.update(dx);
         if (event.cancelable) event.preventDefault();
         event.stopPropagation();
       };
       const end = (event: TouchEvent) => {
         const current = gesture;
-        reset();
-        if (!current || event.touches.length !== 0) return;
+        if (!current || event.touches.length !== 0) {
+          reset();
+          return;
+        }
         const touch = Array.from(event.changedTouches).find(
           (item) => item.identifier === current.id,
         );
-        if (!touch) return;
+        if (!touch) {
+          reset();
+          return;
+        }
+        gesture = null;
+        restoreTarget();
         const dx = touch.clientX - current.x;
         const dy = touch.clientY - current.y;
         const open =
           dx >= 48 &&
           dx > Math.abs(dy) * 1.5 &&
-          event.timeStamp - current.time <= 1000;
+          (current.claimed || event.timeStamp - current.time <= 1000);
         if (current.claimed || open) {
           if (event.cancelable) event.preventDefault();
           event.stopPropagation();
-          if (open) getTrigger()?.click();
+          if (motion) motion.finish(open);
+          else if (open) getTrigger()?.click();
           clearClick();
           clickTarget = current.target;
           clickTimer = window.setTimeout(clearClick, 400);
@@ -173,6 +195,7 @@ export default definePluginApp((app) => {
       window.addEventListener("touchcancel", reset, { capture: true });
       window.addEventListener("click", suppressClick, { capture: true });
       window.addEventListener("blur", reset);
+      window.addEventListener("resize", reset);
       const dispose = () => {
         reset();
         clearClick();
@@ -185,6 +208,7 @@ export default definePluginApp((app) => {
         window.removeEventListener("touchcancel", reset, true);
         window.removeEventListener("click", suppressClick, true);
         window.removeEventListener("blur", reset);
+        window.removeEventListener("resize", reset);
         signal.removeEventListener("abort", dispose);
       };
       signal.addEventListener("abort", dispose, { once: true });
