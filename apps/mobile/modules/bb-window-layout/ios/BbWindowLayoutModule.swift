@@ -51,6 +51,11 @@ final class BbWindowLayoutView: ExpoView {
 
   override func didMoveToWindow() {
     super.didMoveToWindow()
+    if window == nil {
+      VerticalBarPreference.unregister(self)
+    } else {
+      VerticalBarPreference.register(self)
+    }
     previousPayload = nil
     setNeedsUpdateConstraints()
     scheduleUpdate()
@@ -133,6 +138,24 @@ enum VerticalBarPreference {
   }
   private(set) static var disabled = false
   private static var installed = false
+  private static let owners = NSHashTable<BbWindowLayoutView>.weakObjects()
+
+  private static var ownedWindows: [UIWindow] {
+    var identities = Set<ObjectIdentifier>()
+    return owners.allObjects.compactMap { view in
+      guard let window = view.window, identities.insert(ObjectIdentifier(window)).inserted else { return nil }
+      return window
+    }
+  }
+
+  static func register(_ view: BbWindowLayoutView) {
+    owners.add(view)
+    apply()
+  }
+
+  static func unregister(_ view: BbWindowLayoutView) {
+    owners.remove(view)
+  }
 
   static func setDisabled(_ value: Bool) {
     guard value != disabled else { return }
@@ -141,18 +164,15 @@ enum VerticalBarPreference {
   }
 
   static func refreshSafeArea() {
-    for scene in UIApplication.shared.connectedScenes {
-      guard let windowScene = scene as? UIWindowScene else { continue }
-      for window in windowScene.windows {
-        guard let root = window.rootViewController else { continue }
-        let original = root.additionalSafeAreaInsets
-        var nudged = original
-        nudged.bottom += 1
-        root.additionalSafeAreaInsets = nudged
-        root.view.layoutIfNeeded()
-        root.additionalSafeAreaInsets = original
-        root.view.setNeedsLayout()
-      }
+    for window in ownedWindows {
+      guard let root = window.rootViewController else { continue }
+      let original = root.additionalSafeAreaInsets
+      var nudged = original
+      nudged.bottom += 1
+      root.additionalSafeAreaInsets = nudged
+      root.view.layoutIfNeeded()
+      root.additionalSafeAreaInsets = original
+      root.view.setNeedsLayout()
     }
   }
 
@@ -160,11 +180,8 @@ enum VerticalBarPreference {
     #if compiler(>=6.4)
     if #available(iOS 27.1, *) {
       install()
-      for scene in UIApplication.shared.connectedScenes {
-        guard let windowScene = scene as? UIWindowScene else { continue }
-        for window in windowScene.windows {
-          window.rootViewController?.setNeedsUpdateOfVerticalBarConfiguration()
-        }
+      for window in ownedWindows {
+        window.rootViewController?.setNeedsUpdateOfVerticalBarConfiguration()
       }
     }
     #endif
@@ -181,7 +198,8 @@ enum VerticalBarPreference {
     typealias Getter = @convention(c) (UIViewController, Selector) -> UIVerticalBarBehavior
     let original = unsafeBitCast(method_getImplementation(method), to: Getter.self)
     let replacement: @convention(block) (UIViewController) -> UIVerticalBarBehavior = { controller in
-      if disabled, let window = controller.viewIfLoaded?.window, window.rootViewController === controller {
+      if disabled, let window = controller.viewIfLoaded?.window,
+        window.rootViewController === controller, ownedWindows.contains(where: { $0 === window }) {
         return .disabled
       }
       return original(controller, selector)

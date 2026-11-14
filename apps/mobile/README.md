@@ -665,9 +665,11 @@ is session-only and resets when the WebView unmounts.
 The local Expo module `modules/bb-window-layout` does the native part:
 
 - `setVerticalBarDisabled(disabled)` applies the expansion on the main queue
-  and answers `.disabled` for each window's root view controller. React Native
-  owns the root controller, so the getter is swizzled for window roots only.
-- `refreshSafeArea()` makes UIKit recompute safe areas from the window root.
+  and answers `.disabled` only for roots of windows containing an attached
+  `BbWindowLayout` view. React Native owns the root controller, so the getter
+  is swizzled for those roots. UIKit keyboard windows retain their own policy.
+- `refreshSafeArea()` makes UIKit recompute safe areas only in those BB windows,
+  preserving the insets of UIKit keyboard windows in the same scene.
   The WebView screen calls it when it regains focus after the bar changed:
   the bar can change while the WebView is covered, and
   the covered screen otherwise keeps its old insets until the app is
