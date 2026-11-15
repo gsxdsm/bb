@@ -91,7 +91,7 @@ module.exports = ({ config }) => {
             adaptiveIcon: {
               ...config.android.adaptiveIcon,
               backgroundColor: "#000000",
-              backgroundImage: undefined,
+              backgroundImage: "./assets/android-icon-background-dev.png",
               foregroundImage: "./assets/android-icon-foreground-dev.png",
             },
           }

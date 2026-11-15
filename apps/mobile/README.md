@@ -138,7 +138,10 @@ adb install -r apps/mobile/build-output/bb-dev.apk
 ```
 
 The APK is `apps/mobile/build-output/bb-dev.apk`. Its launcher icon matches the
-iOS dev artwork: a white BB mark on black with an orange DEV band. It has an
+iOS dev artwork: a white BB mark on black with an orange DEV band. The
+adaptive-icon foreground is `ios-icon-dev.png` scaled into the 66dp safe zone,
+and `android-icon-background-dev.png` carries its black and orange to the
+edges, so launcher masks keep the DEV band. It has an
 orange favicon and splash logo, the name **bb dev**, and package
 `app.getbb.mobile.dev`, so it installs alongside the regular app with separate
 saved servers and data. It
