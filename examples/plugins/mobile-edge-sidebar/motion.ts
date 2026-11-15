@@ -1,3 +1,5 @@
+import { flushSync } from "react-dom";
+
 export function createSidebarMotion(
   openSidebar: () => void,
   closeSidebar: () => void,
@@ -97,11 +99,11 @@ export function createSidebarMotion(
     if (done) return;
     done = true;
     window.clearTimeout(timer);
-    if (!mobile && !committed) closeSidebar();
+    if (!mobile && !committed) flushSync(closeSidebar);
     restore();
   };
   update(0);
-  if (!mobile) openSidebar();
+  if (!mobile) flushSync(openSidebar);
   return {
     update(delta: number) {
       if (!settling) update(delta);

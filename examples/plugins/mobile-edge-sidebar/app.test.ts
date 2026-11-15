@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { act, createElement, useState } from "react";
+import { createRoot } from "react-dom/client";
 import {
   loadPluginApp,
   mountPluginContentScripts,
@@ -409,5 +411,62 @@ it("does not restore the host's old closed-position styles after committing open
     expect(backdrop.style.opacity).toBe("");
   } finally {
     vi.useRealTimers();
+  }
+});
+
+it("cancels a wide drag before React's queued open can leak through", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  document.body.replaceChildren();
+  const container = document.createElement("div");
+  document.body.append(container);
+  const root = createRoot(container);
+  function SidebarHost() {
+    const [open, setOpen] = useState(false);
+    return createElement(
+      "div",
+      null,
+      createElement(
+        "button",
+        {
+          "data-sidebar": "trigger",
+          "aria-expanded": open,
+          onClick: () => setOpen((value) => !value),
+        },
+        "Sidebar",
+      ),
+      createElement(
+        "div",
+        null,
+        createElement("div", { "data-sidebar": "gap" }),
+        createElement("nav", { "data-sidebar": "panel" }),
+      ),
+      createElement("main", { "data-sidebar": "inset" }),
+    );
+  }
+  try {
+    await act(async () => root.render(createElement(SidebarHost)));
+    target = container.querySelector("main")!;
+    const panel = container.querySelector<HTMLElement>(
+      '[data-sidebar="panel"]',
+    )!;
+    const gap = container.querySelector<HTMLElement>('[data-sidebar="gap"]')!;
+    vi.spyOn(gap, "getBoundingClientRect").mockReturnValue(
+      new DOMRect(0, 0, 48, 800),
+    );
+    vi.spyOn(panel, "getBoundingClientRect").mockImplementation(
+      () => new DOMRect(0, 0, panel.style.width ? 256 : 48, 800),
+    );
+    await act(async () => {
+      touch("touchstart", 8);
+      touch("touchmove", 100);
+      touch("touchcancel", 100);
+    });
+    expect(
+      container.querySelector("button")!.getAttribute("aria-expanded"),
+    ).toBe("false");
+    expect(target.style.translate).toBe("");
+    expect(gap.style.width).toBe("");
+  } finally {
+    await act(async () => root.unmount());
   }
 });
