@@ -6,7 +6,7 @@ export const THREAD_REPLY_CATEGORY = "bb-thread-reply";
 export const THREAD_REPLY_ACTION = "bb-reply";
 const SENT_REPLIES_KEY = "bb.push.sentReplies";
 
-const replySchema = z.object({
+export const notificationReplySchema = z.object({
   actionIdentifier: z.literal(THREAD_REPLY_ACTION),
   userText: z.string().trim().min(1),
   notification: z.object({
@@ -37,7 +37,7 @@ export function createNotificationReplyHandler(deps: NotificationReplyDeps) {
   let delivered: string[] = [];
 
   return async (response: unknown): Promise<boolean> => {
-    const parsed = replySchema.safeParse(response);
+    const parsed = notificationReplySchema.safeParse(response);
     if (!parsed.success) return false;
     const { userText, notification } = parsed.data;
     const { identifier, content } = notification.request;

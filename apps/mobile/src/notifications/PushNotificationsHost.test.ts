@@ -189,14 +189,7 @@ describe("PushNotificationsHost", () => {
     );
   });
 
-  it("sends a notification reply before opening its thread", async () => {
-    let finish: ((sent: boolean) => void) | undefined;
-    mocks.reply.mockImplementationOnce(
-      () =>
-        new Promise<boolean>((resolve) => {
-          finish = resolve;
-        }),
-    );
+  it("leaves reply handling to the background receiver without navigating", async () => {
     const response: NotificationResponse = {
       actionIdentifier: "bb-reply",
       userText: "Continue",
@@ -213,18 +206,9 @@ describe("PushNotificationsHost", () => {
       },
     };
     mocks.responseListener(response);
-    expect(mocks.reply).toHaveBeenCalledWith(response);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(mocks.reply).not.toHaveBeenCalled();
     expect(mocks.push).not.toHaveBeenCalled();
-    finish?.(true);
-    await vi.waitFor(() =>
-      expect(mocks.push).toHaveBeenCalledWith({
-        pathname: "/webview",
-        params: {
-          path: "/projects/proj_1/threads/thr_1",
-          profileId: "profile-1",
-        },
-      }),
-    );
   });
 
   it("switches to the server whose registration a threadless push names", async () => {

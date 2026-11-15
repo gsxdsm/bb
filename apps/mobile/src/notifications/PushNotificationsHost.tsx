@@ -25,11 +25,7 @@ import { getPushRegistrationController } from "./push-controller";
 import { getPushStore } from "./push-storage";
 import { hasThreadOnServer } from "./thread-probe";
 import { usePushStoreSnapshot } from "./use-push-store";
-import { THREAD_REPLY_ACTION } from "@/data/notifications/notification-reply";
-import {
-  handleNotificationReply,
-  registerNotificationReplyCategory,
-} from "./notification-reply";
+import { registerNotificationReplyCategory } from "./notification-reply";
 
 export function PushNotificationsHost() {
   const { status, profiles, activeProfile, connection } = useProfiles();
@@ -111,21 +107,7 @@ export function PushNotificationsHost() {
       const target = parsePushNotificationData(
         response.notification.request.content.data,
       );
-      if (response.actionIdentifier === THREAD_REPLY_ACTION) {
-        void handleNotificationReply(response)
-          .then((sent) => {
-            if (!sent)
-              toast.error("Your reply was empty or could not be read.");
-            if (target) void openTarget(target);
-          })
-          .catch(() => {
-            toast.error("Reply not sent", {
-              description:
-                "Open the thread and try sending your message again.",
-            });
-            if (target) void openTarget(target);
-          });
-      } else if (
+      if (
         response.actionIdentifier === Notifications.DEFAULT_ACTION_IDENTIFIER
       ) {
         if (target) void openTarget(target);

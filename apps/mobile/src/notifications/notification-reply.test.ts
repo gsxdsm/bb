@@ -1,15 +1,35 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const native = vi.hoisted(() => ({
   entries: new Map<string, string>(),
   cookies: vi.fn(async () => undefined),
   dismiss: vi.fn(async () => undefined),
   category: vi.fn(async () => null),
+  failure: vi.fn(async () => "failure-notification"),
+  task: vi.fn<(body: { data: unknown; error?: Error }) => Promise<number>>(),
+  presented: vi.fn(async () => []),
 }));
 
 vi.mock("expo-notifications", () => ({
   dismissNotificationAsync: native.dismiss,
   setNotificationCategoryAsync: native.category,
+  scheduleNotificationAsync: native.failure,
+  registerTaskAsync: vi.fn(async () => null),
+  addNotificationResponseReceivedListener: vi.fn(() => ({ remove: vi.fn() })),
+  getPresentedNotificationsAsync: native.presented,
+  BackgroundNotificationTaskResult: { NewData: 0, NoData: 1, Failed: 2 },
+}));
+vi.mock("expo-task-manager", () => ({
+  defineTask: (
+    _name: string,
+    executor: (body: { data: unknown; error?: Error }) => Promise<number>,
+  ) => {
+    native.task.mockImplementation(executor);
+  },
+}));
+vi.mock("react-native", () => ({
+  Platform: { OS: "ios" },
+  AppState: { currentState: "background" },
 }));
 vi.mock("@/lib/native/cookie-store", () => ({
   nativeCookieStore: { set: native.cookies },
@@ -54,6 +74,13 @@ import {
   registerNotificationReplyCategory,
 } from "./notification-reply";
 
+import "./background-notification-task";
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  native.entries.clear();
+});
+
 afterEach(() => {
   vi.unstubAllGlobals();
 });
@@ -93,7 +120,10 @@ describe("native notification reply delivery", () => {
           submitButtonTitle: "Send",
           placeholder: "Message this thread",
         },
-        options: { opensAppToForeground: true, isAuthenticationRequired: true },
+        options: {
+          opensAppToForeground: false,
+          isAuthenticationRequired: true,
+        },
       }),
     ]);
     expect(
@@ -112,5 +142,91 @@ describe("native notification reply delivery", () => {
     ).toBe(true);
     expect(requestFetch).toHaveBeenCalledTimes(2);
     expect(native.dismiss).toHaveBeenCalledWith("request-1");
+  });
+});
+
+describe("background notification task", () => {
+  it.each(["ios", "android"])(
+    "sends a %s reply without mounting the app UI",
+    async (platform) => {
+      const requestFetch = vi.fn<typeof fetch>(async (input) => {
+        if (String(input).endsWith("/api/connect/desktop-session")) {
+          return Response.json({
+            cookie: {
+              domain: "bb.example.test",
+              expiresAt: Date.now() + 60_000,
+              name: "session",
+              value: "test-session",
+            },
+          });
+        }
+        return Response.json({ ok: true, delivery: "queued" });
+      });
+      vi.stubGlobal("fetch", requestFetch);
+      const response = {
+        actionIdentifier: "bb-reply",
+        userText: "Background reply",
+        notification: {
+          request: {
+            identifier: `background-${platform}`,
+            content: {
+              data: { threadId: "thread-1", subscriptionId: "subscription-1" },
+            },
+          },
+        },
+      };
+      const data =
+        platform === "ios"
+          ? { data: { bbNotificationReply: response } }
+          : response;
+      expect(await native.task({ data })).toBe(0);
+      const sends = requestFetch.mock.calls.filter(([url]) =>
+        String(url).endsWith("/api/v1/threads/thread-1/send"),
+      );
+      expect(sends).toHaveLength(1);
+      expect(JSON.parse(String(sends[0]?.[1]?.body))).toMatchObject({
+        input: [{ type: "text", text: "Background reply" }],
+        mode: "queue-if-active",
+      });
+      expect(native.dismiss).toHaveBeenCalledWith(`background-${platform}`);
+      expect(native.failure).not.toHaveBeenCalled();
+    },
+  );
+
+  it("shows a notification when a background reply cannot be sent", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new Error("offline");
+      }),
+    );
+    expect(
+      await native.task({
+        data: {
+          actionIdentifier: "bb-reply",
+          userText: "Retry this reply",
+          notification: {
+            request: {
+              identifier: "background-failure",
+              content: {
+                data: {
+                  threadId: "thread-1",
+                  subscriptionId: "subscription-1",
+                },
+              },
+            },
+          },
+        },
+      }),
+    ).toBe(2);
+    expect(native.failure).toHaveBeenCalledWith(
+      expect.objectContaining({
+        content: expect.objectContaining({
+          title: "Reply not sent",
+          data: expect.objectContaining({ threadId: "thread-1" }),
+        }),
+      }),
+    );
+    expect(native.dismiss).not.toHaveBeenCalled();
   });
 });

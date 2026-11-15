@@ -1,2 +1,2 @@
-import "./src/notifications/dismiss-read-threads-task";
+import "./src/notifications/background-notification-task";
 import "expo-router/entry";

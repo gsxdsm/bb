@@ -63,7 +63,7 @@ export async function registerNotificationReplyCategory(): Promise<void> {
         submitButtonTitle: "Send",
         placeholder: "Message this thread",
       },
-      options: { opensAppToForeground: true, isAuthenticationRequired: true },
+      options: { opensAppToForeground: false, isAuthenticationRequired: true },
     },
   ]);
 }

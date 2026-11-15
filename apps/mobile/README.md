@@ -169,7 +169,15 @@ generation. Both light and dark splash screens use the orange logo.
 
 `with-notification-actions` routes reply-enabled FCM notifications through Expo's
 native presenter so Android background notifications include the registered Reply
-action. Other FCM messages keep their normal handling.
+action. Other FCM messages keep their normal handling. On iOS the same plugin
+installs a native notification-action delegate that starts Expo's background task
+runner and keeps the app alive while a reply is sent. The background task is
+loaded before the router and uses the same saved-server authentication and chat
+send path as foreground messages. Sending a Reply leaves the current app on
+screen; a normal notification tap still opens the thread. Failed sends show a
+notification linking back to the thread. Open an updated build once before using
+the new action so the category and background task are registered. The task keeps
+its existing registration identifier so updates retain silent-dismiss support.
 
 Use `pnpm mobile:apk:dev -- x86_64` for an Intel emulator. The default is
 `arm64-v8a` for a physical phone. Install Android SDK/build tools and JDK 17
@@ -547,7 +555,7 @@ iOS keeps its existing APNs registration behavior.
   server notified about is read on any client, the server sends each device a
   silent push (`_contentAvailable` on iOS, a data-only message on Android;
   data `{"kind":"dismiss","threadId":"…"}`).
-  `src/notifications/dismiss-read-threads-task.ts`, loaded from `index.ts`
+  `src/notifications/background-notification-task.ts`, loaded from `index.ts`
   before expo-router, runs as an `expo-task-manager` background notification
   task and removes the delivered notifications whose `threadId` matches. The
   foreground handler never lists a dismiss push. iOS delays or drops silent

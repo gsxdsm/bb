@@ -1,5 +1,8 @@
 const {
   AndroidConfig,
+  IOSConfig,
+  withAppDelegate,
+  withXcodeProject,
   withAndroidManifest,
   withAppBuildGradle,
   withDangerousMod,
@@ -8,6 +11,46 @@ const { mkdir, copyFile } = require("node:fs/promises");
 const path = require("node:path");
 
 module.exports = function withNotificationActions(config) {
+  config = withAppDelegate(config, (mod) => {
+    if (mod.modResults.language !== "swift") {
+      throw new Error("Notification replies require a Swift AppDelegate");
+    }
+    if (
+      !mod.modResults.contents.includes("BbNotificationReplyDelegate.install()")
+    ) {
+      const anchor = "let delegate = ReactNativeDelegate()";
+      if (!mod.modResults.contents.includes(anchor)) {
+        throw new Error(
+          "Could not install the iOS notification reply delegate",
+        );
+      }
+      mod.modResults.contents = mod.modResults.contents.replace(
+        anchor,
+        `BbNotificationReplyDelegate.install()\n    ${anchor}`,
+      );
+    }
+    return mod;
+  });
+  config = withXcodeProject(config, async (mod) => {
+    const projectName = mod.modRequest.projectName;
+    if (!projectName) throw new Error("Could not resolve the iOS project name");
+    const filename = "BbNotificationReplyDelegate.swift";
+    const directory = path.join(
+      mod.modRequest.platformProjectRoot,
+      projectName,
+    );
+    await mkdir(directory, { recursive: true });
+    await copyFile(
+      path.join(__dirname, "ios", filename),
+      path.join(directory, filename),
+    );
+    IOSConfig.XcodeUtils.addBuildSourceFileToGroup({
+      filepath: `${projectName}/${filename}`,
+      groupName: projectName,
+      project: mod.modResults,
+    });
+    return mod;
+  });
   config = withAppBuildGradle(config, (mod) => {
     const dependency =
       'implementation("com.google.firebase:firebase-messaging:25.0.1")';

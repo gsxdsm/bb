@@ -4,7 +4,7 @@ Get a notification when an agent asks a question, finishes a turn, or stops on a
 
 Mobile devices receive push messages through Expo, including when the app is closed. Web browsers and the desktop app receive system notifications over bb's live connection while a tab or window stays open; web delivery needs HTTPS (or localhost) and notification permission. Mobile WebViews use mobile push only.
 
-On mobile, expand a thread notification and choose **Reply** to send a text message to that thread. Sending opens bb and posts through the same thread-send API as the chat composer (`sdk.threads.send` or `bb thread send`). If the thread is busy, the reply queues for its next turn. Notifications without a thread have no reply action. The mobile app must support the reply category; older builds continue to open notifications normally.
+On mobile, expand a thread notification and choose **Reply** to send a text message to that thread. Sending keeps bb in the background and posts through the same thread-send API as the chat composer (`sdk.threads.send` or `bb thread send`). If the thread is busy, the reply queues for its next turn. Notifications without a thread have no reply action. The mobile app must support the reply category; older builds continue to open notifications normally.
 
 Each thread has a level: `all` (questions, approvals, errors, finished turns), `input-only` (no finished turns), or `muted`. A thread uses its own level, else `childLevel` if it has a parent, else `defaultLevel`; every ancestor's own level caps it. Muting a parent mutes its whole subtree, but a parent never makes workers louder. The level applies on top of the suppressions below.
 
