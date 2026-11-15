@@ -29,18 +29,23 @@ describe("terminal touch selection", () => {
     });
   });
 
-  it("scrolls while the finger is within a row of the top or bottom edge", () => {
+  it("scrolls only after the finger travels at least a row toward an edge", () => {
     const geometry = {
       cols: 10,
       rows: 5,
       screenRect: { left: 0, top: 100, width: 100, height: 100 },
       viewportY: 0,
     };
-    expect(terminalEdgeScrollDirection(90, geometry)).toBe(-1);
-    expect(terminalEdgeScrollDirection(110, geometry)).toBe(-1);
-    expect(terminalEdgeScrollDirection(150, geometry)).toBe(0);
-    expect(terminalEdgeScrollDirection(185, geometry)).toBe(1);
-    expect(terminalEdgeScrollDirection(400, geometry)).toBe(1);
+    expect(terminalEdgeScrollDirection(90, 150, geometry)).toBe(-1);
+    expect(terminalEdgeScrollDirection(105, 150, geometry)).toBe(-1);
+    expect(terminalEdgeScrollDirection(115, 150, geometry)).toBe(0);
+    expect(terminalEdgeScrollDirection(105, 110, geometry)).toBe(0);
+    expect(terminalEdgeScrollDirection(95, 110, geometry)).toBe(0);
+    expect(terminalEdgeScrollDirection(85, 110, geometry)).toBe(-1);
+    expect(terminalEdgeScrollDirection(150, 150, geometry)).toBe(0);
+    expect(terminalEdgeScrollDirection(195, 150, geometry)).toBe(1);
+    expect(terminalEdgeScrollDirection(195, 190, geometry)).toBe(0);
+    expect(terminalEdgeScrollDirection(400, 190, geometry)).toBe(1);
   });
 
   it("expands a long press to the whole word, including wide characters", async () => {

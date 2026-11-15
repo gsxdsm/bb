@@ -72,16 +72,21 @@ export function terminalCellFromClientPoint(
 
 export function terminalEdgeScrollDirection(
   pointY: number,
+  startY: number,
   { rows, screenRect }: TerminalScreenGeometry,
 ): TerminalEdgeScrollDirection {
   if (rows <= 0) {
     return 0;
   }
-  const edgeZone = screenRect.height / rows;
-  if (pointY < screenRect.top + edgeZone) {
+  const rowHeight = screenRect.height / rows;
+  const edgeZone = rowHeight / 2;
+  if (pointY < screenRect.top + edgeZone && startY - pointY >= rowHeight) {
     return -1;
   }
-  if (pointY > screenRect.top + screenRect.height - edgeZone) {
+  if (
+    pointY > screenRect.top + screenRect.height - edgeZone &&
+    pointY - startY >= rowHeight
+  ) {
     return 1;
   }
   return 0;
@@ -203,7 +208,7 @@ export function attachTerminalTouchSelection({
     const direction =
       geometry === null
         ? 0
-        : terminalEdgeScrollDirection(lastPoint.y, geometry);
+        : terminalEdgeScrollDirection(lastPoint.y, startPoint.y, geometry);
     if (direction === edgeScrollDirection) {
       return;
     }
