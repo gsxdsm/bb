@@ -164,6 +164,10 @@ describe("native notification reply delivery", () => {
       }),
     ).toBe(true);
     expect(requestFetch).toHaveBeenCalledTimes(2);
+    expect(requestFetch.mock.calls[0]?.[1]?.signal).toBeInstanceOf(AbortSignal);
+    expect(requestFetch.mock.calls[1]?.[1]?.signal).toBe(
+      requestFetch.mock.calls[0]?.[1]?.signal,
+    );
     expect(native.dismiss).toHaveBeenCalledWith("request-1");
   });
 });

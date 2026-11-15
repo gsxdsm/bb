@@ -25,10 +25,11 @@ export function handleNotificationReply(response: unknown): Promise<boolean> {
       return store.getSnapshot().registrations;
     },
     async send(profile, threadId, text) {
+      const signal = AbortSignal.timeout(20_000);
       const mobileFetch = createMobileFetch((input, init) =>
         fetch(input, {
           ...init,
-          signal: AbortSignal.timeout(20_000),
+          signal,
         }),
       );
       if (profile.mode === "connect") {
