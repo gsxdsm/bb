@@ -5,6 +5,7 @@ import type { PushStorage } from "./push-store";
 export const THREAD_REPLY_CATEGORY = "bb-thread-reply";
 export const THREAD_REPLY_ACTION = "bb-reply";
 const SENT_REPLIES_KEY = "bb.push.sentReplies";
+const serializedContentSchema = z.object({ dataString: z.string() });
 
 export const notificationReplySchema = z.object({
   actionIdentifier: z.literal(THREAD_REPLY_ACTION),
@@ -12,14 +13,26 @@ export const notificationReplySchema = z.object({
   notification: z.object({
     request: z.object({
       identifier: z.string().min(1),
-      content: z.object({
-        data: z.object({
-          threadId: z.string().min(1),
-          subscriptionId: z.string().min(1),
-          projectId: z.string().min(1).nullish(),
-          serverUrl: z.string().min(1).nullish(),
+      content: z.preprocess(
+        (content) => {
+          const serialized = serializedContentSchema.safeParse(content);
+          if (!serialized.success) return content;
+          try {
+            const data: unknown = JSON.parse(serialized.data.dataString);
+            return { data };
+          } catch {
+            return content;
+          }
+        },
+        z.object({
+          data: z.object({
+            threadId: z.string().min(1),
+            subscriptionId: z.string().min(1),
+            projectId: z.string().min(1).nullish(),
+            serverUrl: z.string().min(1).nullish(),
+          }),
         }),
-      }),
+      ),
     }),
   }),
 });

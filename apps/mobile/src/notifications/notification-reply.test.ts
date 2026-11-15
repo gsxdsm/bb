@@ -205,7 +205,19 @@ describe("background notification task", () => {
       const data =
         platform === "ios"
           ? { data: { bbNotificationReply: response } }
-          : response;
+          : {
+              ...response,
+              notification: {
+                request: {
+                  identifier: response.notification.request.identifier,
+                  content: {
+                    dataString: JSON.stringify(
+                      response.notification.request.content.data,
+                    ),
+                  },
+                },
+              },
+            };
       expect(await native.task({ data })).toBe(0);
       const sends = requestFetch.mock.calls.filter(([url]) =>
         String(url).endsWith("/api/v1/threads/thread-1/send"),
@@ -219,6 +231,27 @@ describe("background notification task", () => {
       expect(native.failure).not.toHaveBeenCalled();
     },
   );
+
+  it("ignores malformed native notification JSON without sending a reply", async () => {
+    const requestFetch = vi.fn<typeof fetch>();
+    vi.stubGlobal("fetch", requestFetch);
+    expect(
+      await native.task({
+        data: {
+          actionIdentifier: "bb-reply",
+          userText: "Continue",
+          notification: {
+            request: {
+              identifier: "malformed-native-json",
+              content: { dataString: "{not-json" },
+            },
+          },
+        },
+      }),
+    ).toBe(1);
+    expect(requestFetch).not.toHaveBeenCalled();
+    expect(native.dismiss).not.toHaveBeenCalled();
+  });
 
   it("shows a notification when a background reply cannot be sent", async () => {
     vi.stubGlobal(
