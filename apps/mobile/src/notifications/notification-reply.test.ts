@@ -7,7 +7,19 @@ const native = vi.hoisted(() => ({
   category: vi.fn(async () => null),
   failure: vi.fn(async () => "failure-notification"),
   task: vi.fn<(body: { data: unknown; error?: Error }) => Promise<number>>(),
-  presented: vi.fn(async () => []),
+  presented: vi.fn<
+    () => Promise<
+      Array<{
+        request: {
+          identifier: string;
+          content: { data: Record<string, string> };
+        };
+      }>
+    >
+  >(async () => []),
+  platform: "ios",
+  appState: { currentState: "background" },
+  listener: vi.fn<(response: unknown) => void>(),
 }));
 
 vi.mock("expo-notifications", () => ({
@@ -15,7 +27,12 @@ vi.mock("expo-notifications", () => ({
   setNotificationCategoryAsync: native.category,
   scheduleNotificationAsync: native.failure,
   registerTaskAsync: vi.fn(async () => null),
-  addNotificationResponseReceivedListener: vi.fn(() => ({ remove: vi.fn() })),
+  addNotificationResponseReceivedListener: vi.fn(
+    (listener: (response: unknown) => void) => {
+      native.listener.mockImplementation(listener);
+      return { remove: vi.fn() };
+    },
+  ),
   getPresentedNotificationsAsync: native.presented,
   BackgroundNotificationTaskResult: { NewData: 0, NoData: 1, Failed: 2 },
 }));
@@ -28,8 +45,12 @@ vi.mock("expo-task-manager", () => ({
   },
 }));
 vi.mock("react-native", () => ({
-  Platform: { OS: "ios" },
-  AppState: { currentState: "background" },
+  Platform: {
+    get OS() {
+      return native.platform;
+    },
+  },
+  AppState: native.appState,
 }));
 vi.mock("@/lib/native/cookie-store", () => ({
   nativeCookieStore: { set: native.cookies },
@@ -83,6 +104,8 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  native.platform = "ios";
+  native.appState.currentState = "background";
 });
 
 describe("native notification reply delivery", () => {
@@ -212,6 +235,8 @@ describe("background notification task", () => {
                 data: {
                   threadId: "thread-1",
                   subscriptionId: "subscription-1",
+                  projectId: "project-1",
+                  serverUrl: "https://bb.example.test",
                 },
               },
             },
@@ -223,10 +248,100 @@ describe("background notification task", () => {
       expect.objectContaining({
         content: expect.objectContaining({
           title: "Reply not sent",
-          data: expect.objectContaining({ threadId: "thread-1" }),
+          data: expect.objectContaining({
+            threadId: "thread-1",
+            projectId: "project-1",
+            serverUrl: "https://bb.example.test",
+          }),
         }),
       }),
     );
     expect(native.dismiss).not.toHaveBeenCalled();
+  });
+});
+
+describe("notification delivery lifecycle", () => {
+  it("continues dismissing read-thread notifications through the registered task", async () => {
+    native.presented.mockResolvedValueOnce([
+      {
+        request: {
+          identifier: "read-notification",
+          content: { data: { threadId: "read-thread" } },
+        },
+      },
+      {
+        request: {
+          identifier: "other-notification",
+          content: { data: { threadId: "other-thread" } },
+        },
+      },
+    ]);
+    expect(
+      await native.task({
+        data: {
+          data: {
+            dataString: JSON.stringify({
+              kind: "dismiss",
+              threadId: "read-thread",
+            }),
+          },
+        },
+      }),
+    ).toBe(0);
+    expect(native.dismiss.mock.calls).toEqual([["read-notification"]]);
+  });
+
+  it("sends from Android's active listener and leaves background callbacks to the task", async () => {
+    native.platform = "android";
+    native.appState.currentState = "active";
+    vi.resetModules();
+    await import("./background-notification-task");
+    const requestFetch = vi.fn<typeof fetch>(async (input) => {
+      if (String(input).endsWith("/api/connect/desktop-session")) {
+        return Response.json({
+          cookie: {
+            domain: "bb.example.test",
+            expiresAt: Date.now() + 60_000,
+            name: "session",
+            value: "test-session",
+          },
+        });
+      }
+      return Response.json({ ok: true, delivery: "queued" });
+    });
+    vi.stubGlobal("fetch", requestFetch);
+    const response = {
+      actionIdentifier: "bb-reply",
+      userText: "Active Android reply",
+      notification: {
+        request: {
+          identifier: "active-android",
+          content: {
+            data: { threadId: "thread-1", subscriptionId: "subscription-1" },
+          },
+        },
+      },
+    };
+    native.listener(response);
+    await vi.waitFor(() =>
+      expect(native.dismiss).toHaveBeenCalledWith("active-android"),
+    );
+    expect(
+      requestFetch.mock.calls.filter(([url]) =>
+        String(url).endsWith("/api/v1/threads/thread-1/send"),
+      ),
+    ).toHaveLength(1);
+    native.appState.currentState = "background";
+    native.listener({
+      ...response,
+      notification: {
+        request: {
+          ...response.notification.request,
+          identifier: "background-owned",
+        },
+      },
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(requestFetch).toHaveBeenCalledTimes(2);
   });
 });

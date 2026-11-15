@@ -1,6 +1,6 @@
-import ExpoModulesCore
-import ExpoNotifications
-import ExpoTaskManager
+internal import ExpoModulesCore
+internal import ExpoNotifications
+internal import ExpoTaskManager
 import UIKit
 import UserNotifications
 

@@ -16,6 +16,8 @@ export const notificationReplySchema = z.object({
         data: z.object({
           threadId: z.string().min(1),
           subscriptionId: z.string().min(1),
+          projectId: z.string().min(1).nullish(),
+          serverUrl: z.string().min(1).nullish(),
         }),
       }),
     }),
